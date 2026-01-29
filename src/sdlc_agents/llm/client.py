@@ -25,7 +25,8 @@ class OpenAICompatibleClient:
         self.model_name = model_name
         self.temperature = temperature
         self.timeout_s = timeout_s
-        self.base_url = "https://api.openai.com/v1/chat/completions"
+        self.base_url = "https://openrouter.ai/api/v1/chat/completions"
+
 
     def chat_text(self, messages: list[dict[str, str]]) -> str:
         payload = {
