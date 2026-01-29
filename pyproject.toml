@@ -1,0 +1,45 @@
+[project]
+name = "sdlc-agents"
+version = "0.1.0"
+description = "GitHub SDLC coding + review agents (Issue -> PR -> CI -> Review -> Fix loops)"
+requires-python = ">=3.11"
+dependencies = [
+  "PyGithub>=2.3.0",
+  "typer>=0.12.3",
+  "pydantic>=2.8.2",
+  "requests>=2.32.3",
+]
+
+[project.optional-dependencies]
+dev = [
+  "ruff>=0.6.8",
+  "black>=24.8.0",
+  "mypy>=1.11.2",
+  "pytest>=8.3.2",
+  "pip-audit>=2.7.3",
+  "types-requests>=2.32.0.20240907",
+]
+
+[project.scripts]
+sdlc-agent = "sdlc_agents.cli:app"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+select = ["E","F","I","B","UP","SIM"]
+ignore = ["E501"]
+
+[tool.black]
+line-length = 100
+target-version = ["py311"]
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+no_implicit_optional = true
+strict = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

@@ -1,0 +1,51 @@
+name: Issue -> PR (Code Agent)
+
+on:
+  issues:
+    types: [opened, edited]
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  code_agent:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install
+        run: |
+          pip install -U pip
+          pip install -e .[dev]
+
+      - name: Run Code Agent (Issue)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+          LLM_PROVIDER: ${{ vars.LLM_PROVIDER }}
+          MODEL_NAME: ${{ vars.MODEL_NAME }}
+          BASE_BRANCH: ${{ vars.BASE_BRANCH }}
+          MAX_ITERS: ${{ vars.MAX_ITERS }}
+          LLM_TEMPERATURE: ${{ vars.LLM_TEMPERATURE }}
+          LLM_TIMEOUT_SECONDS: ${{ vars.LLM_TIMEOUT_SECONDS }}
+        run: |
+          python -m sdlc_agents.cli run-issue --issue-number "${{ github.event.issue.number }}"
+
+      - name: Upload agent report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-issue-report
+          path: agent_reports/
+          if-no-files-found: ignore
