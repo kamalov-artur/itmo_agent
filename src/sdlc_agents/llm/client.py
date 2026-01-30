@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from typing import Any
+import os
 import requests
 
 
@@ -16,7 +17,7 @@ class OpenAICompatibleClient:
 
     Requires:
       - api_key
-      - base_url (default OpenAI)
+      - base_url (OpenRouter here)
       - model_name
     """
 
@@ -27,16 +28,30 @@ class OpenAICompatibleClient:
         self.timeout_s = timeout_s
         self.base_url = "https://openrouter.ai/api/v1/chat/completions"
 
-
     def chat_text(self, messages: list[dict[str, str]]) -> str:
+        # Some providers behind OpenRouter reject the "developer" role (e.g., Google AI Studio).
+        normalized: list[dict[str, str]] = []
+        for m in messages:
+            role = m.get("role", "user")
+            if role == "developer":
+                role = "system"
+            normalized.append({"role": role, "content": m.get("content", "")})
+
         payload = {
             "model": self.model_name,
-            "messages": messages,
+            "messages": normalized,
             "temperature": self.temperature,
         }
+
         r = requests.post(
             self.base_url,
-            headers={"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"},
+            headers={
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json",
+                # Optional but recommended for OpenRouter:
+                "HTTP-Referer": f"https://github.com/{os.getenv('GITHUB_REPOSITORY','')}",
+                "X-Title": "itmo_agent_sdlc",
+            },
             data=json.dumps(payload),
             timeout=self.timeout_s,
         )
