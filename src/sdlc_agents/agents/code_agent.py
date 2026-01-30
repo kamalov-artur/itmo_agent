@@ -56,10 +56,9 @@ def extract_json_object(text: str) -> str:
         elif ch == "}":
             depth -= 1
             if depth == 0:
-                return t[start : i + 1]
+                return t[start: i + 1]
 
     raise ValueError("Unbalanced braces while extracting JSON")
-
 
 
 def _run(cmd: list[str]) -> None:
@@ -87,7 +86,8 @@ def _write_files(plan: CodePlan) -> list[str]:
 
 
 def _quality_checks() -> dict[str, Any]:
-    result: dict[str, Any] = {"ruff": None, "black": None, "mypy": None, "pytest": None}
+    result: dict[str, Any] = {"ruff": None,
+                              "black": None, "mypy": None, "pytest": None}
     cmds = [
         ("ruff", ["ruff", "check", "."]),
         ("black", ["black", "--check", "."]),
@@ -99,7 +99,8 @@ def _quality_checks() -> dict[str, Any]:
             subprocess.run(cmd, check=True, capture_output=True, text=True)
             result[name] = "ok"
         except subprocess.CalledProcessError as e:
-            result[name] = {"status": "fail", "stdout": e.stdout[-2000:], "stderr": e.stderr[-2000:]}
+            result[name] = {
+                "status": "fail", "stdout": e.stdout[-2000:], "stderr": e.stderr[-2000:]}
             break
     return result
 
@@ -119,6 +120,7 @@ def _parse_decision_block(text: str) -> dict[str, Any] | None:
         return None
     block = m.group(0)
     # naive parse for a few keys
+
     def g(key: str) -> str | None:
         mm = re.search(rf"(?m)^\s*{re.escape(key)}:\s*(.+)\s*$", block)
         return mm.group(1).strip() if mm else None
@@ -139,7 +141,8 @@ def run_issue(*, settings: Settings, gh: GithubClient, issue_number: int) -> Non
 
     # Safety: if already done, exit
     if LABEL_DONE in issue.labels:
-        write_report(f"code_issue_{issue_number}_skipped", {"reason": "already_done", "env": env_summary()})
+        write_report(f"code_issue_{issue_number}_skipped", {
+                     "reason": "already_done", "env": env_summary()})
         return
 
     # Mark in progress
@@ -152,7 +155,8 @@ def run_issue(*, settings: Settings, gh: GithubClient, issue_number: int) -> Non
     branch = f"agent/issue-{issue_number}"
 
     # Prepare git
-    _git("config", "user.email", "github-actions[bot]@users.noreply.github.com")
+    _git("config", "user.email",
+         "github-actions[bot]@users.noreply.github.com")
     _git("config", "user.name", "github-actions[bot]")
     _git("checkout", base_branch)
     _git("pull", "--ff-only", "origin", base_branch)
@@ -186,9 +190,12 @@ def run_issue(*, settings: Settings, gh: GithubClient, issue_number: int) -> Non
             },
         ]
         raw = llm.chat_text(messages)
-        plan = CodePlan.model_validate_json(raw)
+        json_text = extract_json_object(raw)
+        plan = CodePlan.model_validate_json(json_text)
+
     except (LLMError, ValidationError) as e:
-        gh.comment_issue(issue_number, f"Agent failed to generate a valid plan: {str(e)[:500]}")
+        gh.comment_issue(
+            issue_number, f"Agent failed to generate a valid plan: {str(e)[:500]}")
         gh.add_issue_labels(issue_number, [LABEL_FAILED])
         gh.remove_issue_labels(issue_number, [LABEL_IN_PROGRESS])
         write_report(
@@ -215,14 +222,16 @@ def run_issue(*, settings: Settings, gh: GithubClient, issue_number: int) -> Non
 
     pr_title = f"Issue #{issue_number}: {issue.title[:80]}"
     pr_body = f"Fixes #{issue_number}\n\nAgent summary:\n- {plan.summary}\n"
-    pr = gh.create_or_get_pr(head_ref=branch, base_ref=base_branch, title=pr_title, body=pr_body)
+    pr = gh.create_or_get_pr(
+        head_ref=branch, base_ref=base_branch, title=pr_title, body=pr_body)
 
     try:
         gh.add_pr_labels(pr.number, ["agent:active"])
     except Exception:
         pass
 
-    gh.comment_issue(issue_number, f"Created/updated PR #{pr.number} for Issue #{issue_number}.")
+    gh.comment_issue(
+        issue_number, f"Created/updated PR #{pr.number} for Issue #{issue_number}.")
 
     write_report(
         f"code_issue_{issue_number}",
@@ -242,7 +251,8 @@ def run_pr_iteration(*, settings: Settings, gh: GithubClient, pr_number: int) ->
     pr = gh.get_pr(pr_number)
     issue_number = gh.extract_issue_number_from_pr_body(pr.body or "")
     if issue_number is None:
-        gh.comment_pr(pr_number, "Cannot iterate: PR is not linked to an Issue (missing `Fixes #N`).")
+        gh.comment_pr(
+            pr_number, "Cannot iterate: PR is not linked to an Issue (missing `Fixes #N`).")
         return
 
     issue = gh.get_issue(issue_number)
@@ -251,7 +261,8 @@ def run_pr_iteration(*, settings: Settings, gh: GithubClient, pr_number: int) ->
     decision = _parse_decision_block(last_bot_review or "")
 
     if not decision:
-        gh.comment_pr(pr_number, "Cannot iterate: no AGENT_DECISION found in latest bot review.")
+        gh.comment_pr(
+            pr_number, "Cannot iterate: no AGENT_DECISION found in latest bot review.")
         return
 
     status = decision.get("status")
@@ -264,15 +275,18 @@ def run_pr_iteration(*, settings: Settings, gh: GithubClient, pr_number: int) ->
             gh.add_issue_labels(issue_number, [LABEL_DONE])
         except Exception:
             pass
-        gh.comment_issue(issue_number, f"Reviewer approved PR #{pr_number}. Marking as done.")
+        gh.comment_issue(
+            issue_number, f"Reviewer approved PR #{pr_number}. Marking as done.")
         write_report(
             f"code_pr_{pr_number}_finalized",
-            {"env": env_summary(), "pr_number": pr_number, "issue_number": issue_number},
+            {"env": env_summary(), "pr_number": pr_number,
+             "issue_number": issue_number},
         )
         return
 
     if iteration >= settings.max_iters:
-        gh.comment_pr(pr_number, f"Stopping: reached MAX_ITERS={settings.max_iters}.")
+        gh.comment_pr(
+            pr_number, f"Stopping: reached MAX_ITERS={settings.max_iters}.")
         try:
             gh.remove_issue_labels(issue_number, [LABEL_IN_PROGRESS])
             gh.add_issue_labels(issue_number, [LABEL_FAILED])
@@ -280,7 +294,8 @@ def run_pr_iteration(*, settings: Settings, gh: GithubClient, pr_number: int) ->
             pass
         write_report(
             f"code_pr_{pr_number}_stopped",
-            {"env": env_summary(), "pr_number": pr_number, "issue_number": issue_number, "iteration": iteration},
+            {"env": env_summary(), "pr_number": pr_number,
+             "issue_number": issue_number, "iteration": iteration},
         )
         return
 
@@ -288,7 +303,8 @@ def run_pr_iteration(*, settings: Settings, gh: GithubClient, pr_number: int) ->
     branch = pr.head_ref
     base_branch = settings.base_branch
 
-    _git("config", "user.email", "github-actions[bot]@users.noreply.github.com")
+    _git("config", "user.email",
+         "github-actions[bot]@users.noreply.github.com")
     _git("config", "user.name", "github-actions[bot]")
     _git("checkout", base_branch)
     _git("pull", "--ff-only", "origin", base_branch)
@@ -315,7 +331,7 @@ def run_pr_iteration(*, settings: Settings, gh: GithubClient, pr_number: int) ->
                 "content": (
                     f"Iterate on PR #{pr_number} for Issue #{issue_number}\n"
                     f"Issue title: {issue.title}\nIssue body:\n{issue.body}\n\n"
-                    f"Reviewer decision block:\n{decision.get('raw','')}\n\n"
+                    f"Reviewer decision block:\n{decision.get('raw', '')}\n\n"
                     "PR diff (truncated):\n"
                     f"{diff}\n\n"
                     "Partial repo file tree:\n"
@@ -328,8 +344,10 @@ def run_pr_iteration(*, settings: Settings, gh: GithubClient, pr_number: int) ->
         raw = llm.chat_text(messages)
         json_text = extract_json_object(raw)
         plan = CodePlan.model_validate_json(json_text)
+
     except (LLMError, ValidationError) as e:
-        gh.comment_pr(pr_number, f"Agent failed to generate a valid fix plan: {str(e)[:500]}")
+        gh.comment_pr(
+            pr_number, f"Agent failed to generate a valid fix plan: {str(e)[:500]}")
         try:
             gh.remove_issue_labels(issue_number, [LABEL_IN_PROGRESS])
             gh.add_issue_labels(issue_number, [LABEL_FAILED])
@@ -337,13 +355,15 @@ def run_pr_iteration(*, settings: Settings, gh: GithubClient, pr_number: int) ->
             pass
         write_report(
             f"code_pr_{pr_number}_failed",
-            {"env": env_summary(), "pr_number": pr_number, "issue_number": issue_number, "error": str(e)},
+            {"env": env_summary(), "pr_number": pr_number,
+             "issue_number": issue_number, "error": str(e)},
         )
         raise SystemExit(1)
 
     changed = _write_files(plan)
     if not changed:
-        gh.comment_pr(pr_number, "Agent produced no changes during iteration. Stopping.")
+        gh.comment_pr(
+            pr_number, "Agent produced no changes during iteration. Stopping.")
         try:
             gh.remove_issue_labels(issue_number, [LABEL_IN_PROGRESS])
             gh.add_issue_labels(issue_number, [LABEL_FAILED])
@@ -354,10 +374,12 @@ def run_pr_iteration(*, settings: Settings, gh: GithubClient, pr_number: int) ->
     qc = _quality_checks()
 
     _git("add", "-A")
-    _git("commit", "-m", f"Agent: fix for issue #{issue_number} (iter {iteration + 1})")
+    _git("commit", "-m",
+         f"Agent: fix for issue #{issue_number} (iter {iteration + 1})")
     _git("push", "origin", branch)
 
-    gh.comment_pr(pr_number, f"Pushed iteration {iteration + 1}. Updated files: {', '.join(changed[:10])}")
+    gh.comment_pr(
+        pr_number, f"Pushed iteration {iteration + 1}. Updated files: {', '.join(changed[:10])}")
 
     write_report(
         f"code_pr_{pr_number}_iter_{iteration+1}",
