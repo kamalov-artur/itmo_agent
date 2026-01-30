@@ -35,6 +35,7 @@ jobs:
       - name: Run Code Agent (PR iteration)
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
           LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
           LLM_PROVIDER: ${{ vars.LLM_PROVIDER }}
           MODEL_NAME: ${{ vars.MODEL_NAME }}
