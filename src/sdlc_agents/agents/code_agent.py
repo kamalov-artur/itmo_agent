@@ -24,6 +24,44 @@ LABEL_DONE = "agent:done"
 LABEL_FAILED = "agent:failed"
 
 
+def extract_json_object(text: str) -> str:
+    t = text.strip()
+
+    # 1) If LLM wrapped JSON in markdown fences, extract the fenced block
+    if "```" in t:
+        parts = t.split("```")
+        for i in range(1, len(parts), 2):
+            chunk = parts[i].strip()
+            # drop leading language tag like "json"
+            if chunk.lower().startswith("json"):
+                chunk = chunk[4:].lstrip()
+            if chunk.startswith("{") and "}" in chunk:
+                t = chunk
+                break
+
+    # 2) Remove leading "json" prefix (your exact failure case)
+    if t.lower().startswith("json"):
+        t = t[4:].lstrip()
+
+    # 3) Extract first JSON object by brace matching
+    start = t.find("{")
+    if start == -1:
+        raise ValueError("No '{' found in LLM output")
+
+    depth = 0
+    for i in range(start, len(t)):
+        ch = t[i]
+        if ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                return t[start : i + 1]
+
+    raise ValueError("Unbalanced braces while extracting JSON")
+
+
+
 def _run(cmd: list[str]) -> None:
     subprocess.run(cmd, check=True)
 
@@ -288,7 +326,8 @@ def run_pr_iteration(*, settings: Settings, gh: GithubClient, pr_number: int) ->
             },
         ]
         raw = llm.chat_text(messages)
-        plan = CodePlan.model_validate_json(raw)
+        json_text = extract_json_object(raw)
+        plan = CodePlan.model_validate_json(json_text)
     except (LLMError, ValidationError) as e:
         gh.comment_pr(pr_number, f"Agent failed to generate a valid fix plan: {str(e)[:500]}")
         try:
