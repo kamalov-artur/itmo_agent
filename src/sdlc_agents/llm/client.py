@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import json
-from typing import Any
 import os
+from typing import Any, List, Dict
 import requests
 
 
@@ -12,13 +12,14 @@ class LLMError(RuntimeError):
 
 class OpenAICompatibleClient:
     """
-    Minimal OpenAI-compatible Chat Completions client.
-    Works with many OpenAI-style providers.
+    OpenAI-compatible Chat Completions client,
+    adapted for OpenRouter providers (including Google AI Studio).
 
-    Requires:
-      - api_key
-      - base_url (OpenRouter here)
-      - model_name
+    IMPORTANT:
+    Some providers (e.g. Google AI Studio for Gemma models)
+    do NOT support system/developer instructions.
+    To ensure compatibility, we collapse the entire conversation
+    into a SINGLE user message.
     """
 
     def __init__(self, api_key: str, model_name: str, temperature: float, timeout_s: int):
@@ -28,36 +29,57 @@ class OpenAICompatibleClient:
         self.timeout_s = timeout_s
         self.base_url = "https://openrouter.ai/api/v1/chat/completions"
 
-    def chat_text(self, messages: list[dict[str, str]]) -> str:
-        # Some providers behind OpenRouter reject the "developer" role (e.g., Google AI Studio).
-        normalized: list[dict[str, str]] = []
+    def chat_text(self, messages: List[Dict[str, str]]) -> str:
+        # Collapse all messages into a single user message.
+        # This avoids "developer/system instruction not enabled" errors.
+        parts: list[str] = []
+
         for m in messages:
             role = m.get("role", "user")
-            if role == "developer":
-                role = "system"
-            normalized.append({"role": role, "content": m.get("content", "")})
+            content = m.get("content", "")
+            if not content:
+                continue
+
+            if role in ("system", "developer"):
+                parts.append(f"[INSTRUCTIONS]\n{content}")
+            elif role == "assistant":
+                parts.append(f"[ASSISTANT_CONTEXT]\n{content}")
+            else:
+                parts.append(f"[USER]\n{content}")
+
+        collapsed_prompt = "\n\n".join(parts).strip()
 
         payload = {
             "model": self.model_name,
-            "messages": normalized,
+            "messages": [
+                {
+                    "role": "user",
+                    "content": collapsed_prompt,
+                }
+            ],
             "temperature": self.temperature,
         }
 
-        r = requests.post(
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json",
+            # Optional but recommended by OpenRouter
+            "HTTP-Referer": f"https://github.com/{os.getenv('GITHUB_REPOSITORY', '')}",
+            "X-Title": "itmo_agent_sdlc",
+        }
+
+        response = requests.post(
             self.base_url,
-            headers={
-                "Authorization": f"Bearer {self.api_key}",
-                "Content-Type": "application/json",
-                # Optional but recommended for OpenRouter:
-                "HTTP-Referer": f"https://github.com/{os.getenv('GITHUB_REPOSITORY','')}",
-                "X-Title": "itmo_agent_sdlc",
-            },
+            headers=headers,
             data=json.dumps(payload),
             timeout=self.timeout_s,
         )
-        if r.status_code >= 300:
-            raise LLMError(f"LLM HTTP {r.status_code}: {r.text[:500]}")
-        data = r.json()
+
+        if response.status_code >= 300:
+            raise LLMError(f"LLM HTTP {response.status_code}: {response.text[:500]}")
+
+        data = response.json()
+
         try:
             return data["choices"][0]["message"]["content"]
         except Exception as e:
@@ -66,9 +88,10 @@ class OpenAICompatibleClient:
 
 class YandexStubClient:
     """
-    Placeholder: you can implement YandexGPT API calls here if needed.
-    For now it raises to avoid silent misconfiguration.
+    Placeholder for YandexGPT.
+    Explicitly fails to avoid silent misconfiguration.
     """
+
     def __init__(self, *_: Any, **__: Any):
         pass
 
@@ -76,9 +99,19 @@ class YandexStubClient:
         raise LLMError("YandexGPT client is not implemented in this template.")
 
 
-def build_llm(provider: str, api_key: str, model_name: str, temperature: float, timeout_s: int):
-    if provider.lower() == "openai":
+def build_llm(
+    provider: str,
+    api_key: str,
+    model_name: str,
+    temperature: float,
+    timeout_s: int,
+):
+    provider = provider.lower()
+
+    if provider == "openai":
         return OpenAICompatibleClient(api_key, model_name, temperature, timeout_s)
-    if provider.lower() == "yandex":
+
+    if provider == "yandex":
         return YandexStubClient()
+
     raise LLMError(f"Unknown LLM_PROVIDER: {provider}")
