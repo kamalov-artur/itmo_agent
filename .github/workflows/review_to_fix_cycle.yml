@@ -1,0 +1,55 @@
+name: Review -> Fix Cycle (Code Agent iteration)
+
+on:
+  pull_request_review:
+    types: [submitted]
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  fix_cycle:
+    runs-on: ubuntu-latest
+    if: |
+      github.event.review.state == 'changes_requested' &&
+      github.event.review.user.login == 'github-actions[bot]'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install
+        run: |
+          pip install -U pip
+          pip install -e .[dev]
+
+      - name: Run Code Agent (PR iteration)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+          LLM_PROVIDER: ${{ vars.LLM_PROVIDER }}
+          MODEL_NAME: ${{ vars.MODEL_NAME }}
+          BASE_BRANCH: ${{ vars.BASE_BRANCH }}
+          MAX_ITERS: ${{ vars.MAX_ITERS }}
+          LLM_TEMPERATURE: ${{ vars.LLM_TEMPERATURE }}
+          LLM_TIMEOUT_SECONDS: ${{ vars.LLM_TIMEOUT_SECONDS }}
+        run: |
+          sdlc-agent run-pr --pr-number "${{ github.event.pull_request.number }}"
+
+      - name: Upload agent report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-fixcycle-report
+          path: agent_reports/
+          if-no-files-found: ignore
