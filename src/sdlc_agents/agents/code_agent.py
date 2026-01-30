@@ -157,7 +157,7 @@ def run_issue(*, settings: Settings, gh: GithubClient, issue_number: int) -> Non
             f"code_issue_{issue_number}_failed",
             {"env": env_summary(), "issue": issue_number, "error": str(e)},
         )
-        return
+        raise SystemExit(1)
 
     changed = _write_files(plan)
 
@@ -165,7 +165,7 @@ def run_issue(*, settings: Settings, gh: GithubClient, issue_number: int) -> Non
         gh.comment_issue(issue_number, "Agent produced no changes. Stopping.")
         gh.add_issue_labels(issue_number, [LABEL_FAILED])
         gh.remove_issue_labels(issue_number, [LABEL_IN_PROGRESS])
-        return
+        raise SystemExit(1)
 
     # Run quick checks locally
     qc = _quality_checks()
@@ -300,7 +300,7 @@ def run_pr_iteration(*, settings: Settings, gh: GithubClient, pr_number: int) ->
             f"code_pr_{pr_number}_failed",
             {"env": env_summary(), "pr_number": pr_number, "issue_number": issue_number, "error": str(e)},
         )
-        return
+        raise SystemExit(1)
 
     changed = _write_files(plan)
     if not changed:
@@ -310,7 +310,7 @@ def run_pr_iteration(*, settings: Settings, gh: GithubClient, pr_number: int) ->
             gh.add_issue_labels(issue_number, [LABEL_FAILED])
         except Exception:
             pass
-        return
+        raise SystemExit(1)
 
     qc = _quality_checks()
 
