@@ -44,7 +44,7 @@ jobs:
           LLM_TEMPERATURE: ${{ vars.LLM_TEMPERATURE }}
           LLM_TIMEOUT_SECONDS: ${{ vars.LLM_TIMEOUT_SECONDS }}
         run: |
-          python -m sdlc_agents.cli run-pr --pr-number "${{ github.event.pull_request.number }}"
+          sdlc-agent run-pr --pr-number "${{ github.event.pull_request.number }}"
 
       - name: Upload agent report
         if: always()

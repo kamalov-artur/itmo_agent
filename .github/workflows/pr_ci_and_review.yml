@@ -65,7 +65,7 @@ jobs:
           LLM_TIMEOUT_SECONDS: ${{ vars.LLM_TIMEOUT_SECONDS }}
           CI_CONCLUSION: ${{ needs.quality.result }}
         run: |
-          python -m sdlc_agents.cli reviewer --pr-number "${{ github.event.pull_request.number }}" --ci-conclusion "${CI_CONCLUSION}"
+          sdlc-agent reviewer --pr-number "${{ github.event.pull_request.number }}" --ci-conclusion "${CI_CONCLUSION}"
 
       - name: Upload reviewer report
         if: always()
