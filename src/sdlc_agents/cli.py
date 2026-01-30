@@ -4,8 +4,8 @@ import typer
 
 from .config import Settings, get_repo_full_name
 from .github.client import GithubClient
-from .agents.code_agent import run_issue, run_pr_iteration
-from .agents.reviewer_agent import run_reviewer
+from .agents.code_agent import run_issue as agent_run_issue, run_pr_iteration
+from .agents.code_agent import run_pr_iteration as agent_run_pr_iteration
 
 app = typer.Typer(no_args_is_help=True)
 
@@ -15,7 +15,7 @@ def run_issue(issue_number: int = typer.Option(..., help="GitHub Issue number"))
     settings = Settings.from_env()
     repo = get_repo_full_name()
     gh = GithubClient(settings.github_token, repo)
-    run_issue(settings=settings, gh=gh, issue_number=issue_number)
+    agent_run_issue(settings=settings, gh=gh, issue_number=issue_number)
 
 
 @app.command()
